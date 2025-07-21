@@ -2,6 +2,7 @@ import pygame as pg
 from pygame.color import THECOLORS
 import asyncio
 from random import randint
+
 startPoints = set()
 
 pg.init()
@@ -20,80 +21,128 @@ class Field:
 
         for width in range(self.screenWidth//10):
             for height in range(self.screenHeight//10):
-                rect = (width*10,height*10,sun)
+                rect = (width*10,height*10,sun,False) #(x,y,sun,condition (true alive, false died))
                 self.rects.add(rect)
 
-    def drawField(self):
+    def drawField(self, livecells: set):
+        global fieldValues
+        self.livecells = livecells
+        self.newRects = set()
+        
+        if self.livecells != set():
+            for livecell in self.livecells:
+                for cell in self.rects:
+                    if cell[3] == True:
+                        self.newRects.add((cell[0],cell[1],0,cell[3]))
+                    elif cell[0] == livecell[0] and livecell[1]<cell[1]:
+                        self.newRects.add((cell[0],cell[1],cell[2]//1.5,cell[3]))
+                    else:
+                        self.newRects.add(cell)
+        else:
+            print('no livecells')
+            for cell in self.rects:
+                self.newRects.add(cell)
+
+        self.rects = self.newRects
+        fieldValues = self.rects
+
+
         for rectValue in self.rects:
             rect = pg.Rect(rectValue[0], rectValue[1],10,10)
-            pg.draw.rect(screen,(255,255-rectValue[2],255-rectValue[2]),rect)
+            pg.draw.rect(screen,(0+rectValue[2],0+rectValue[2],0),rect) #make many yellow values
             pg.draw.rect(screen,(0,0,0),rect, width=1)
         pg.display.flip
 
 class Tree:
-    def __init__(self, genomValues: list, place: tuple, fieldValues: set):
+    def __init__(self, genomValues: list, place: tuple):
         self.color = (randint(0,255),randint(0,255),randint(0,255))
         self.cells = set() #(x,y,genom,sun,energy)
         self.startPoint = pg.Rect(place[0],place[1],10,10)
-        self.fieldValues = fieldValues
         self.genomValues = genomValues
         self.newCells = set()
         self.time = 0
         self.longLife = 0
         self.status = True
-        
-        for tup in fieldValues:
-            if tup[0] == place[0]+10 and tup[1] == place[1]: #поиск sun зная x,y
-                self.sun = tup[2]
 
         self.newCells.add((place[0],place[1],self.genomValues[0],100,100))
         self.cells.add((place[0],place[1],self.genomValues[0],100,100)) #genom 0 always starts
         pg.draw.rect(screen, self.color, self.startPoint)
-        pg.display.update()
 
     def startGrow(self):
         global startPoints
+        global fieldValues
+
         self.time +=1 #counter of time
-        newCells = set() # set with points of grow
+        self.clearNewCells = set()
         for cell in self.newCells:
-            sun = 100
+            sun = 100 #заглушка епта
             self.counter = 0
             chromosome = cell[2]
                 
-            for gen in chromosome:
+            for gen in chromosome: #add new cells
                 if gen<8:
-                    if self.counter == 0 and not (cell[0]-10,cell[1],self.genomValues,sun,100) in self.cells:
-                        newCells.add((cell[0]-10,cell[1],self.genomValues[gen],sun,100))
+                    # if (self.counter == 0) and ((cell[0]-10,cell[1],self.genomValues,sun,100) not in self.cells) and ((cell[0]-10,cell[1],0,True) not in fieldValues):
+                    #     self.clearNewCells.add((cell[0]-10,cell[1],self.genomValues[gen],sun,100))
 
-                    elif self.counter == 1 and not (cell[0],cell[1]+10,self.genomValues,sun,100) in self.cells:
-                        newCells.add((cell[0],cell[1]+10,self.genomValues[gen],sun,100))
+                    # elif (self.counter == 1) and ((cell[0],cell[1]+10,self.genomValues,sun,100) not in self.cells) and ((cell[0],cell[1]+10,0,True) not in fieldValues):
+                    #     self.clearNewCells.add((cell[0],cell[1]+10,self.genomValues[gen],sun,100))
 
-                    elif self.counter == 2 and not (cell[0]+10,cell[1],self.genomValues,sun,100) in self.cells:
-                        newCells.add((cell[0]+10,cell[1],self.genomValues[gen],sun,100))
+                    # elif (self.counter == 2) and ((cell[0]+10,cell[1],self.genomValues,sun,100) not in self.cells) and ((cell[0]+10,cell[1],0,True) not in fieldValues):
+                    #     self.clearNewCells.add((cell[0]+10,cell[1],self.genomValues[gen],sun,100))
 
-                    elif self.counter == 3 and not (cell[0],cell[1]-10,self.genomValues,sun,100) in self.cells:
-                        newCells.add((cell[0],cell[1]-10,self.genomValues[gen],sun,100))
+                    # elif (self.counter == 3) and  ((cell[0],cell[1]-10,self.genomValues,sun,100) not in self.cells) and ((cell[0],cell[1]-10,0,True) not in fieldValues):
+                    #     self.clearNewCells.add((cell[0],cell[1]-10,self.genomValues[gen],sun,100))
+
+                    if self.counter == 0:
+                        self.clearNewCells.add((cell[0]-10,cell[1],self.genomValues[gen],sun,100))
+
+                    elif self.counter == 1:
+                        self.clearNewCells.add((cell[0],cell[1]+10,self.genomValues[gen],sun,100))
+
+                    elif self.counter == 2:
+                        self.clearNewCells.add((cell[0]+10,cell[1],self.genomValues[gen],sun,100))
+
+                    elif self.counter == 3:
+                        self.clearNewCells.add((cell[0],cell[1]-10,self.genomValues[gen],sun,100))
                 elif gen>8:
                     self.longLife = gen*3
                 else:
                     self.longLife = 0
-                self.counter+=1
-                
-        self.cells.update(self.newCells)
-        self.newCells = newCells
-        for cell in self.newCells:
-            rect = pg.Rect(cell[0], cell[1],10,10)
-            #pg.draw.rect(screen,THECOLORS['brown'],rect)
+                self.counter+=1             
 
         for cell in self.cells:
             rect = pg.Rect(cell[0], cell[1],10,10)
             pg.draw.rect(screen,self.color,rect)
 
-        if self.time > self.longLife:
+        delete = set()
+        for cell in self.newCells:
+            if cell in self.cells:
+                delete.add(cell)
+        
+        self.clearNewCells.difference_update(delete) #delete fantom cells
+
+        self.newCells = self.clearNewCells
+        self.cells.update(self.clearNewCells)   
+
+        for cell in self.newCells:
+            if self.genomValues.index(cell[2])==0:
+                rect = pg.Rect(cell[0], cell[1],10,10)
+                pg.draw.rect(screen,THECOLORS['brown'],rect)
+
+        if self.time > self.longLife: #kill old tree
+            for cell in self.clearNewCells:
+                if self.genomValues.index(cell[2])==0: #seeds have to be with gen 0
+                    startPoints.add((cell[0],690,self.genomValues))
             self.status = False
-            for cell in newCells:
-                startPoints.add((cell[0],690,self.genomValues))
-        pg.display.flip
+
+    def returnData(self):
+        data = set()
+        for cell in self.cells:
+            data.add((cell[0],cell[1],0,True)) #x,y,sun,condition
+        for cell in self.newCells:
+            data.add((cell[0],cell[1],0,True))
+
+        return data
 
 class Genom():
     def __init__(self):
@@ -109,36 +158,43 @@ class Genom():
 
 async def Simuation():
     global startPoints
-    
-    print(startPoints)
-    sun = 100 #this parameter changes the sun value
-    field = Field(sun)
-    field.drawField()
+    global fieldValues
+    sun = 200 #this parameter changes the sun value
     trees = []
+    field = Field(sun)
+    livecells = set()
+
     while True:
+        
+        screen.fill(THECOLORS['white']) #renew screen
+        field.drawField(livecells)
+        fieldValues = field.rects
+
         if trees == []:
             sun = 100 #this parameter changes the sun value
             genomValues = Genom().genom
-            tree = Tree(genomValues = genomValues, place = (700,690), fieldValues=field.rects)
+            tree = Tree(genomValues = genomValues, place = (700,690))
             trees.append(tree)
             startPoints = set()
-            pg.display.update()
+            livecells = set()
 
-        screen.fill(THECOLORS['white'])
-        field.drawField()
-            
         for tree in trees:
             if tree.status == True:
-                tree.startGrow()
+                if tree.returnData:
+                    livecells.update(tree.returnData()) #returns live cells
+                    tree.startGrow()
+                
             else:
                 trees.remove(tree)
+
         delete = set()
         for cell in startPoints:
             delete.add(cell)
-            tree = Tree(genomValues=cell[2], place=(cell[0],cell[1]), fieldValues=field.rects)
+            tree = Tree(genomValues=cell[2], place=(cell[0],cell[1]))
             trees.append(tree)
         startPoints = startPoints-delete
         pg.display.flip()
+        
 
 async def CheckEvents():
     running = True
